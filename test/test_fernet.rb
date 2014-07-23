@@ -7,47 +7,36 @@ require 'rack/mock'
 class FernetTest < Minitest::Test
   def setup
     unprotected_app = Rack::Lint.new(lambda do |env|
-      [ 200, {'Content-Type' => 'text/plain'}, ["Hello"] ]
+      [ 200, {'Content-Type' => env["CONTENT_TYPE"].to_s }, [env["rack.input"].read] ]
     end)
-    @realm = "Lillet"
     @secret = "SqD5Mz/qFnXPLVTvkQKRDyVpli3Q6/habc7i89IrBRA="
-    @app = Rack::Auth::Fernet.new(unprotected_app, @secret, @realm)
+    @app = Rack::Fernet.new(unprotected_app, @secret)
     @request = Rack::MockRequest.new(@app)
   end
 
-  def test_no_credentials
-    request do |response|
-      assert_basic_auth_challenge(response)
+  def test_invalid_signature
+    request("garbage") do |response|
+      assert_equal(response.status, 400)
     end
   end
 
-  def test_wrong_credentials
-    request_with_auth('token') do |response|
-      assert_basic_auth_challenge(response)
-    end
-  end
-
-  def test_correct_credentials
-    token = Fernet.generate(@secret, 'Podensac')
-    request_with_auth(token) do |response|
+  def test_valid_signature
+    data = Fernet.generate(@secret, '{}')
+    request(data) do |response|
       assert_equal(response.status, 200)
-      assert_equal(response.body, "Hello")
+      assert_equal(response.body, '{}')
+      assert_equal(response.headers['Content-Type'], 'application/json')
+    end
+  end
+
+  def test_empty_payload
+    request do |response|
+      assert_equal(response.status, 200)
     end
   end
 
   private
-  def request(headers={})
-    yield @request.get('/', headers)
-  end
-
-  def request_with_auth(token, &block)
-    request('HTTP_AUTHORIZATION' => 'Basic ' + [":#{token}"].pack("m*"), &block)
-  end
-
-  def assert_basic_auth_challenge(response)
-    assert_equal(response.status, 401)
-    assert_includes(response, 'WWW-Authenticate')
-    assert(response.headers['WWW-Authenticate'] =~ /Basic realm="#{Regexp.escape(@realm)}"/)
-    assert_empty(response.body)
+  def request(body=nil, headers={})
+    yield @request.get('/', input: body, CONTENT_TYPE: 'application/octet-stream')
   end
 end
