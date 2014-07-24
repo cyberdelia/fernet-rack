@@ -13,8 +13,8 @@ Gem::Specification.new do |gem|
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
   gem.name          = "fernet-rack"
   gem.require_paths = ["lib"]
-  gem.version       = '0.4'
+  gem.version       = '0.5'
 
-  gem.add_runtime_dependency "fernet", '~> 1.6'
+  gem.add_runtime_dependency "fernet", '~> 2.0'
   gem.add_development_dependency "minitest", '~> 5.4'
 end

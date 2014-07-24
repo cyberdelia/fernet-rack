@@ -1,5 +1,6 @@
-require 'rack'
 require 'fernet'
+require 'json'
+require 'rack'
 
 
 module Rack
@@ -27,17 +28,16 @@ module Rack
     end
 
     def call(env)
-      if env["CONTENT_TYPE"] != 'application/octect-stream' && !env["rack.input"].size.zero?
-        verifier = ::Fernet.verifier(@secret, env["rack.input"].read)
-        if verifier.valid?
-          env['CONTENT_TYPE'] = @content_type
-          env["rack.input"] = StringIO.new(verifier.data || verifier.message)
-          @app.call(env)
-        else
-          bad_request
-        end
-      else
+      payload = env["rack.input"].read
+      verifier = ::Fernet.verifier(@secret, payload)
+      if verifier.valid?
+        env["CONTENT_TYPE"] = @content_type
+        env["rack.input"] = StringIO.new(verifier.message)
         @app.call(env)
+      elsif payload.size.zero?
+        @app.call(env)
+      else
+        bad_request
       end
     end
 
