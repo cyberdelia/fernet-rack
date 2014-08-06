@@ -28,8 +28,13 @@ module Rack
     end
 
     def call(env)
+      secret = if @secret.respond_to? :call
+                 @secret.call(env)
+               else
+                 @secret
+               end
       payload = env["rack.input"].read
-      verifier = ::Fernet.verifier(@secret, payload)
+      verifier = ::Fernet.verifier(secret, payload)
       if verifier.valid?
         env["CONTENT_TYPE"] = @content_type
         env["rack.input"] = StringIO.new(verifier.message)
