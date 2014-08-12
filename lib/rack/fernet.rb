@@ -39,7 +39,7 @@ module Rack
       end
 
       status, headers, body = @app.call(env)
-      str_body = to_str(body)
+      str_body = read_body(body)
       unless str_body.empty?
         encoded = encrypt_response(env, str_body)
         headers['Content-Type'] = 'application/octet-stream'
@@ -53,7 +53,7 @@ module Rack
 
     private
 
-    def to_str(body)
+    def read_body(body)
       if body.respond_to? :join
         body.join('')
       else
