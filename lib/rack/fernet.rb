@@ -4,6 +4,8 @@ require 'rack'
 
 
 module Rack
+  class FernetError < StandardError; end
+
   module Auth
     class Fernet < Rack::Auth::Basic
       def initialize(app, secret, realm=nil)
@@ -28,25 +30,65 @@ module Rack
     end
 
     def call(env)
-      secret = if @secret.respond_to?(:call)
+      payload = env["rack.input"].read
+
+      unless payload.empty?
+        payload = decrypt_request(env, payload)
+        env["CONTENT_TYPE"] = @content_type
+        env["rack.input"] = StringIO.new(payload)
+      end
+
+      status, headers, body = @app.call(env)
+      str_body = to_str(body)
+      unless str_body.empty?
+        encoded = encrypt_response(env, str_body)
+        headers['Content-Type'] = 'application/octet-stream'
+        headers['Content-Length'] = encoded.length
+        body = [ encoded ]
+      end
+      [status, headers, body]
+    rescue FernetError
+      bad_request
+    end
+
+    private
+
+    def to_str(body)
+      if body.respond_to? :join
+        body.join('')
+      else
+        result = []
+        body.each { |line| result << line }
+        result.join('')
+      end
+    end
+
+    def secret(env)
+      if @secret.respond_to?(:call)
         @secret.call(env)
       else
         @secret
       end
-      payload = env["rack.input"].read
-      verifier = ::Fernet.verifier(secret, payload)
-      if verifier.valid?
-        env["CONTENT_TYPE"] = @content_type
-        env["rack.input"] = StringIO.new(verifier.message)
-        @app.call(env)
-      elsif payload.size.zero?
-        @app.call(env)
-      else
-        bad_request
-      end
     end
 
-    private
+    def encrypt_response(env, payload)
+      ::Fernet.generate(secret(env), payload)
+    rescue => e
+      raise FernetError
+    end
+
+    def decrypt_request(env, payload)
+      # read the payload
+      verifier = ::Fernet.verifier(secret(env), payload)
+      if verifier.valid?
+        verifier.message
+      else
+        raise FernetError
+      end
+    rescue => e
+      raise FernetError
+    end
+
     def bad_request
       return [ 400,
         { 'Content-Type' => 'text/plain',
