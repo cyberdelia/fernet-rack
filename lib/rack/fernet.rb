@@ -47,7 +47,7 @@ module Rack
         body = [ encoded ]
       end
       [status, headers, body]
-    rescue FernetError
+    rescue ::Fernet::Error
       bad_request
     end
 
@@ -73,8 +73,6 @@ module Rack
 
     def encrypt_response(env, payload)
       ::Fernet.generate(secret(env), payload)
-    rescue => e
-      raise FernetError
     end
 
     def decrypt_request(env, payload)
@@ -83,10 +81,8 @@ module Rack
       if verifier.valid?
         verifier.message
       else
-        raise FernetError
+        raise ::Fernet::Error
       end
-    rescue => e
-      raise FernetError
     end
 
     def bad_request

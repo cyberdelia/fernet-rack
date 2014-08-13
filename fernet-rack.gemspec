@@ -15,6 +15,6 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
   gem.version       = '0.6'
 
-  gem.add_runtime_dependency "fernet", '~> 2.0'
+  gem.add_runtime_dependency "fernet", '~> 2.1'
   gem.add_development_dependency "minitest", '~> 5.4'
 end
