@@ -31,10 +31,10 @@ module Rack
 
     def call(env)
       payload = env["rack.input"].read
+      env["CONTENT_TYPE"] = @content_type
 
       unless payload.empty?
         payload = decrypt_request(env, payload)
-        env["CONTENT_TYPE"] = @content_type
         env["rack.input"] = StringIO.new(payload)
       end
 
